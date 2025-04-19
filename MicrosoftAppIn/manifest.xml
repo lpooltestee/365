@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xsi:type="MailApp">
+
+  <Id>E0BF8F2A-B92E-4A50-A89C-63C245F3E48D</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Hoffmann DH</ProviderName>
+  <DefaultLocale>pt-BR</DefaultLocale>
+  <DisplayName DefaultValue="Assinatura Corporativa" />
+  <Description DefaultValue="Add-in para assinaturas corporativas no Outlook"/>
+  <IconUrl DefaultValue="https://assinaturas.hoffmanndh.com/static/logo.png"/>
+  <HighResolutionIconUrl DefaultValue="https://assinaturas.hoffmanndh.com/static/logo.png"/>
+  <SupportUrl DefaultValue="https://assinaturas.hoffmanndh.com/support" />
+
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.1" />
+    </Sets>
+  </Requirements>
+
+  <FormSettings>
+    <Form xsi:type="ItemEdit">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://assinaturas.hoffmanndh.com/addin/index.html"/>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <Permissions>ReadWriteItem</Permissions>
+
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit" />
+  </Rule>
+
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.3">
+        <bt:Set Name="Mailbox" />
+      </bt:Sets>
+    </Requirements>
+    
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+          <FunctionFile resid="functionFile" />
+          
+          <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="msgComposeGroup">
+                <Label resid="groupLabel" />
+                <Control xsi:type="Button" id="msgComposeInsertSignature">
+                  <Label resid="insertSignatureButtonLabel" />
+                  <Supertip>
+                    <Title resid="insertSignatureButtonTitle" />
+                    <Description resid="insertSignatureButtonDesc" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="icon16" />
+                    <bt:Image size="32" resid="icon32" />
+                    <bt:Image size="80" resid="icon80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="taskpaneUrl" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    
+    <Resources>
+      <bt:Images>
+        <bt:Image id="icon16" DefaultValue="https://assinaturas.hoffmanndh.com/static/logo-16.png" />
+        <bt:Image id="icon32" DefaultValue="https://assinaturas.hoffmanndh.com/static/logo-32.png" />
+        <bt:Image id="icon80" DefaultValue="https://assinaturas.hoffmanndh.com/static/logo-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="functionFile" DefaultValue="https://assinaturas.hoffmanndh.com/addin/functions.html" />
+        <bt:Url id="taskpaneUrl" DefaultValue="https://assinaturas.hoffmanndh.com/addin/index.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="groupLabel" DefaultValue="Assinatura" />
+        <bt:String id="insertSignatureButtonLabel" DefaultValue="Inserir Assinatura" />
+        <bt:String id="insertSignatureButtonTitle" DefaultValue="Inserir Assinatura" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="insertSignatureButtonDesc" DefaultValue="Insere a assinatura corporativa no e-mail." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

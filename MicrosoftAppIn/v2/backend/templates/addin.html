@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <title>Assinatura Corporativa</title> <!-- Adicionar um título é bom -->
+
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
+
+    <script type="text/javascript">
+        Office.onReady(info => {
+            // Verifica se está rodando no Outlook
+            if (info.host === Office.HostType.Outlook) {
+                console.log("Office.onReady disparado no Outlook.");
+                injectSignature();
+            } else {
+                console.log("Não está rodando no Outlook.");
+                document.getElementById("status").innerText = "Este add-in só funciona no Outlook.";
+            }
+        });
+
+        function injectSignature() {
+            const userEmail = Office.context.mailbox.userProfile.emailAddress;
+            const statusElement = document.getElementById("status"); // Para feedback
+
+            if (!userEmail) {
+                console.error("Não foi possível obter o email do usuário.");
+                statusElement.innerText = "Erro: Não foi possível obter o email do usuário.";
+                return;
+            }
+
+            statusElement.innerText = `Buscando assinatura para ${userEmail}...`;
+            console.log(`Buscando assinatura para ${userEmail}...`);
+
+            // --- USA URL RELATIVA ---
+            // Assume que addin.html e /api/signature estão no mesmo domínio/porta
+            const apiUrl = `/api/signature?email=${encodeURIComponent(userEmail)}`;
+            console.log(`Chamando API: ${apiUrl}`);
+
+            fetch(apiUrl)
+                .then(response => {
+                    console.log(`Resposta da API recebida. Status: ${response.status}`);
+                    if (!response.ok) {
+                        // Se a resposta não for OK (ex: 404, 500), lança um erro
+                        throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
+                    }
+                    return response.json(); // Extrai o JSON
+                })
+                .then(data => {
+                    if (data && data.signature_html) {
+                        console.log("Assinatura recebida da API.");
+                        statusElement.innerText = "Inserindo assinatura...";
+                        // --- USA prependAsync --- (Insere no início do corpo)
+                        Office.context.mailbox.item.body.prependAsync(
+                            data.signature_html,
+                            { coercionType: Office.CoercionType.Html },
+                            (asyncResult) => { // --- ADICIONA CALLBACK ---
+                                if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+                                    console.error(`Erro ao inserir assinatura: ${asyncResult.error.message}`);
+                                    statusElement.innerText = `Erro ao inserir: ${asyncResult.error.message}`;
+                                } else {
+                                    console.log("Assinatura inserida com sucesso.");
+                                    statusElement.innerText = "Assinatura inserida!";
+                                    // Opcional: Fechar o painel do add-in se não for mais necessário
+                                    // Office.context.ui.closeContainer();
+                                }
+                            }
+                        );
+                    } else {
+                        console.warn("Resposta da API não continha signature_html esperado.");
+                        statusElement.innerText = "Não foi possível obter a assinatura (resposta inválida).";
+                    }
+                })
+                .catch(error => { // --- ADICIONA TRATAMENTO DE ERRO ---
+                    console.error("Falha ao buscar ou processar assinatura:", error);
+                    statusElement.innerText = `Erro na comunicação com a API: ${error.message}`;
+                });
+        }
+    </script>
+</head>
+<body>
+    <!-- Adiciona um elemento para feedback visual -->
+    <div id="status" style="font-family: sans-serif; font-size: 12px; padding: 10px;">
+        Inicializando...
+    </div>
+</body>
+</html>
