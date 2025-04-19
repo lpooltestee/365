@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Usuários</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+        
+        .navbar {
+            margin-bottom: 20px;
+        }
+        
+        .user-list {
+            margin-top: 20px;
+        }
+        
+        .search-bar {
+            margin-bottom: 20px;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100px;
+        }
+        
+        .alert-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: none;
+        }
+        
+        /* Estilo personalizado para a tabela */
+        .table-users {
+            font-size: 0.9rem;
+        }
+        
+        .table-users thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+        }
+        
+        .actions-column {
+            width: 130px;
+            min-width: 130px;
+        }
+    </style>
+    
+    <script>
+        // Função para verificar se um cookie específico existe
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // Verifica se o cookie de sessão existe ao carregar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Verificando cookie de sessão...");
+            const sessionToken = getCookie('session_token');
+            const sessionCheck = getCookie('session_check');
+            
+            if (!sessionToken && !sessionCheck) {
+                console.error("Cookie de sessão não encontrado, redirecionando para login");
+                
+                // Verificar no localStorage se temos backup de sessão
+                const localSession = localStorage.getItem('userSession');
+                if (localSession) {
+                    console.log("Dados de sessão encontrados no localStorage, tentando recuperar");
+                    const sessionData = JSON.parse(localSession);
+                    
+                    // Se a sessão foi criada há menos de 24 horas, evita redirecionar
+                    const ageInHours = (Date.now() - sessionData.timestamp) / (1000 * 60 * 60);
+                    if (ageInHours < 24) {
+                        console.log("Usando dados de backup de sessão");
+                        return; // Não redireciona, tenta usar a página mesmo sem cookie
+                    }
+                }
+                
+                // Se não houver backup ou sessão expirada, redireciona
+                window.location.href = '/admin/login';
+            } else {
+                console.log("Cookie de sessão encontrado:", sessionCheck ? "session_check=1" : (sessionToken ? sessionToken.substring(0, 10) + "..." : "nenhum"));
+                
+                // Atualizar timestamp no localStorage
+                const localSession = localStorage.getItem('userSession');
+                if (localSession) {
+                    const sessionData = JSON.parse(localSession);
+                    sessionData.timestamp = Date.now();
+                    localStorage.setItem('userSession', JSON.stringify(sessionData));
+                }
+            }
+        });
+    </script>
+</head>
+<body>
+    <!-- Alerta de status -->
+    <div class="alert alert-success alert-dismissible fade show alert-status" role="alert" id="statusAlert">
+        <span id="statusMessage"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+    </div>
+
+    <!-- Navegação -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/admin">Administração</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/admin/users">Usuários</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/signatures">Assinaturas</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="logout">Sair</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteúdo Principal -->
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h1>Gerenciamento de Usuários</h1>
+            </div>
+            <div class="col-md-6 text-end">
+                <button class="btn btn-primary" id="btnSyncUsers">
+                    <i class="bi bi-arrow-repeat"></i> Sincronizar Todos os Usuários
+                </button>
+            </div>
+        </div>
+        
+        <!-- Barra de Pesquisa e Filtros -->
+        <div class="row search-bar">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="searchInput" placeholder="Pesquisar por nome ou e-mail...">
+                    <button class="btn btn-outline-secondary" type="button" id="btnClearSearch">Limpar</button>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filterSetor">
+                    <option value="">Todos os setores</option>
+                    <!-- Setores serão carregados dinamicamente -->
+                </select>
+            </div>
+            <div class="col-md-3 text-end">
+                <span id="userCount" class="badge bg-primary">0 usuários</span>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-primary" id="btnEditSelected" disabled>
+                        <i class="bi bi-pencil"></i> Editar</button>
+                    <button class="btn btn-outline-success" id="btnAssignSelected" disabled>
+                        <i class="bi bi-envelope"></i> Atribuir Assinatura</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tabela de Usuários -->
+        <div class="table-responsive user-list">
+            <table class="table table-striped table-hover table-users" id="usersTable">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Nome</th>
+                        <th>Cargo</th>
+                        <th>Setor</th>
+                        <th>Empresa</th>
+                        <th>Data Cadastro</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Usuários serão carregados dinamicamente aqui -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Modal para Edição de Usuário -->
+        <div class="modal fade" id="userModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="userModalTitle">Editar Usuário</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="userForm">
+                            <div class="mb-3">
+                                <label for="userEmail" class="form-label">E-mail</label>
+                                <input type="email" class="form-control" id="userEmail" readonly>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="userName" class="form-label">Nome Completo</label>
+                                <input type="text" class="form-control" id="userName" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="userCargo" class="form-label">Cargo</label>
+                                <input type="text" class="form-control" id="userCargo">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="userSetor" class="form-label">Setor</label>
+                                <input type="text" class="form-control" id="userSetor">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="userEmpresa" class="form-label">Empresa</label>
+                                <input type="text" class="form-control" id="userEmpresa">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="userTelefone" class="form-label">Telefone</label>
+                                <input type="text" class="form-control" id="userTelefone">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="userRamal" class="form-label">Ramal</label>
+                                <input type="text" class="form-control" id="userRamal">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btnSaveUser">Salvar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal para Atribuir Assinatura -->
+        <div class="modal fade" id="signatureModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Atribuir Assinatura</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="signatureForm">
+                            <div class="mb-3">
+                                <label for="signatureEmail" class="form-label">E-mail</label>
+                                <input type="email" class="form-control" id="signatureEmail" readonly>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="signatureTemplate" class="form-label">Template</label>
+                                <select class="form-select" id="signatureTemplate" required>
+                                    <option value="">Selecione um template</option>
+                                    <!-- Templates serão carregados dinamicamente aqui -->
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="useCustomHtml">
+                                    <label class="form-check-label" for="useCustomHtml">
+                                        Usar HTML personalizado
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3" id="customHtmlContainer" style="display: none;">
+                                <label for="customHtml" class="form-label">HTML Personalizado</label>
+                                <textarea class="form-control" id="customHtml" rows="5"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btnAssign">Atribuir</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal para Atribuição em Massa -->
+        <div class="modal fade" id="bulkAssignModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Atribuir Assinatura em Massa</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Você selecionou <span id="selectedCount">0</span> usuários.</p>
+                        
+                        <form id="bulkSignatureForm">
+                            <div class="mb-3">
+                                <label for="bulkSignatureTemplate" class="form-label">Template</label>
+                                <select class="form-select" id="bulkSignatureTemplate" required>
+                                    <option value="">Selecione um template</option>
+                                    <!-- Templates serão carregados dinamicamente aqui -->
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btnBulkAssign">Atribuir</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const baseUrl = "{{ base_url }}";
+
+        // Verifica se o usuário está autenticado
+        function checkAuth() {
+            console.log("Verificando autenticação...");
+            const token = getCookie('session_token');
+            const sessionCheck = getCookie('session_check');
+            
+            if (!token && !sessionCheck) {
+                console.error("Nenhum cookie de sessão encontrado");
+                
+                // Se estamos sendo redirecionados repetidamente, quebrar o ciclo
+                const redirectCount = localStorage.getItem('authRedirectCount') || 0;
+                if (parseInt(redirectCount) > 3) {
+                    console.error("Ciclo de redirecionamento detectado, mantendo na página atual");
+                    localStorage.setItem('authRedirectCount', 0);
+                    alert("Erro de autenticação. Por favor, tente fazer login novamente manualmente.");
+                    return;
+                }
+                
+                // Incrementar contador de redirecionamentos
+                localStorage.setItem('authRedirectCount', parseInt(redirectCount) + 1);
+                window.location.href = '/admin/login';
+                return;
+            }
+            
+            console.log("Cookie de sessão encontrado:", sessionCheck ? "session_check=1" : (token ? token.substring(0, 10) + "..." : "nenhum"));
+            localStorage.setItem('authRedirectCount', 0);
+            
+            // Se temos cookies, não precisamos fazer uma verificação adicional com a API
+            // para evitar ciclos de requisição/redirecionamento
+            return true;
+        }
+
+        // Obter um cookie pelo nome
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+
+        // Carregar a lista de usuários
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin' // Importante para enviar cookies
+                });
+
+                if (response.status === 401) {
+                    console.error("Erro 401: Não autenticado");
+                    window.location.href = '/admin/login';
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const users = await response.json();
+                console.log("Usuários carregados:", users);
+                
+                const tbody = document.querySelector('#usersTable tbody');
+                if (!tbody) {
+                    console.error('Elemento tbody não encontrado no usersTable');
+                    return;
+                }
+
+                // Verificar se há usuários para exibir
+                if (!users || users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum usuário encontrado</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = users.map(user => `
+                    <tr>
+                        <td>${user.email || ''}</td>
+                        <td>${user.nome_completo || ''}</td>
+                        <td>${user.cargo || ''}</td>
+                        <td>${user.setor || ''}</td>
+                        <td>${user.empresa || ''}</td>
+                        <td>${user.created_at ? new Date(user.created_at).toLocaleString() : ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editUser('${user.email}')">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-success" onclick="assignSignature('${user.email}')">
+                                <i class="bi bi-envelope"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+                
+                // Atualizar contador de usuários
+                const userCount = document.getElementById('userCount');
+                if (userCount) {
+                    userCount.textContent = `${users.length} usuários`;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar usuários:', error);
+                const tbody = document.querySelector('#usersTable tbody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Erro ao carregar usuários. Por favor, tente novamente.</td></tr>';
+                }
+            }
+        }
+
+        // Carregar usuários quando a página carregar
+        document.addEventListener('DOMContentLoaded', loadUsers);
+
+        // Carregar os templates de assinatura
+        function loadTemplates() {
+            fetch(`${baseUrl}/api/templates`, {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(templates => {
+                // Preencher o select do modal de atribuição individual
+                const select = document.getElementById('signatureTemplate');
+                select.innerHTML = '<option value="">Selecione um template</option>';
+                
+                templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.id;
+                    option.textContent = template.name + (template.is_default ? ' (Padrão)' : '');
+                    select.appendChild(option);
+                });
+                
+                // Preencher o select do modal de atribuição em massa
+                const bulkSelect = document.getElementById('bulkSignatureTemplate');
+                bulkSelect.innerHTML = '<option value="">Selecione um template</option>';
+                
+                templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.id;
+                    option.textContent = template.name + (template.is_default ? ' (Padrão)' : '');
+                    bulkSelect.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Erro ao carregar templates:', error);
+            });
+        }
+
+        // Mostrar mensagem de status
+        function showStatusMessage(message, type = 'success') {
+            const alert = document.getElementById('statusAlert');
+            const messageElement = document.getElementById('statusMessage');
+            
+            alert.className = `alert alert-${type} alert-dismissible fade show alert-status`;
+            messageElement.textContent = message;
+            
+            alert.style.display = 'block';
+            
+            // Esconder a mensagem após 5 segundos
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        // Sincronizar todos os usuários
+        function syncAllUsers() {
+            if (!confirm('Tem certeza que deseja sincronizar todos os usuários com o Microsoft 365? Esta operação pode demorar alguns minutos.')) {
+                return;
+            }
+            
+            showStatusMessage('Sincronizando usuários, por favor aguarde...', 'info');
+            
+            fetch(`${baseUrl}/api/admin/sync-users`, {
+                method: 'POST',
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatusMessage('Usuários sincronizados com sucesso!');
+                    loadUsers();
+                } else {
+                    showStatusMessage('Falha na sincronização: ' + data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao sincronizar usuários:', error);
+                showStatusMessage('Erro ao sincronizar usuários', 'danger');
+            });
+        }
+
+        // Sincronizar um único usuário
+        function syncUser(email) {
+            if (!confirm(`Tem certeza que deseja sincronizar o usuário ${email} com o Microsoft 365?`)) {
+                return;
+            }
+            
+            showStatusMessage(`Sincronizando usuário ${email}, por favor aguarde...`, 'info');
+            
+            fetch(`${baseUrl}/api/admin/sync-user/${encodeURIComponent(email)}`, {
+                method: 'POST',
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatusMessage(`Usuário ${email} sincronizado com sucesso!`);
+                    loadUsers();
+                } else {
+                    showStatusMessage('Falha na sincronização: ' + data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao sincronizar usuário:', error);
+                showStatusMessage('Erro ao sincronizar usuário', 'danger');
+            });
+        }
+
+        // Editar um usuário
+        function editUser(email) {
+            // Obter os dados do usuário
+            fetch(`${baseUrl}/api/admin/users/${encodeURIComponent(email)}`, {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(user => {
+                document.getElementById('userEmail').value = user.email;
+                document.getElementById('userName').value = user.nome_completo || '';
+                document.getElementById('userCargo').value = user.cargo || '';
+                document.getElementById('userSetor').value = user.setor || '';
+                document.getElementById('userEmpresa').value = user.empresa || '';
+                document.getElementById('userTelefone').value = user.telefone || '';
+                document.getElementById('userRamal').value = user.ramal || '';
+                
+                // Exibir o modal
+                const modal = new bootstrap.Modal(document.getElementById('userModal'));
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Erro ao obter usuário:', error);
+                showStatusMessage('Erro ao obter dados do usuário', 'danger');
+            });
+        }
+
+        // Salvar usuário
+        function saveUser() {
+            const email = document.getElementById('userEmail').value;
+            const nome = document.getElementById('userName').value;
+            const cargo = document.getElementById('userCargo').value;
+            const setor = document.getElementById('userSetor').value;
+            const empresa = document.getElementById('userEmpresa').value;
+            const telefone = document.getElementById('userTelefone').value;
+            const ramal = document.getElementById('userRamal').value;
+            
+            if (!email || !nome) {
+                alert('E-mail e nome são obrigatórios');
+                return;
+            }
+            
+            const data = {
+                nome_completo: nome,
+                cargo: cargo,
+                setor: setor,
+                empresa: empresa,
+                telefone: telefone,
+                ramal: ramal
+            };
+            
+            fetch(`${baseUrl}/api/admin/users/${encodeURIComponent(email)}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao salvar usuário');
+                }
+                return response.json();
+            })
+            .then(() => {
+                // Fechar o modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('userModal'));
+                modal.hide();
+                
+                // Recarregar a lista de usuários
+                loadUsers();
+                
+                // Exibir mensagem de sucesso
+                showStatusMessage(`Usuário ${email} atualizado com sucesso!`);
+            })
+            .catch(error => {
+                console.error('Erro ao salvar usuário:', error);
+                showStatusMessage('Erro ao salvar usuário', 'danger');
+            });
+        }
+
+        // Atribuir assinatura a um usuário
+        function assignSignature(email) {
+            // Carregar os templates se ainda não foram carregados
+            if (document.getElementById('signatureTemplate').options.length <= 1) {
+                loadTemplates();
+            }
+            
+            document.getElementById('signatureEmail').value = email;
+            document.getElementById('customHtml').value = '';
+            document.getElementById('useCustomHtml').checked = false;
+            document.getElementById('customHtmlContainer').style.display = 'none';
+            
+            // Exibir o modal
+            const modal = new bootstrap.Modal(document.getElementById('signatureModal'));
+            modal.show();
+        }
+
+        // Salvar a atribuição de assinatura
+        function saveAssignment() {
+            const email = document.getElementById('signatureEmail').value;
+            const templateId = document.getElementById('signatureTemplate').value;
+            const useCustomHtml = document.getElementById('useCustomHtml').checked;
+            const customHtml = useCustomHtml ? document.getElementById('customHtml').value : null;
+            
+            if (!email || !templateId) {
+                alert('E-mail e template são obrigatórios');
+                return;
+            }
+            
+            const data = {
+                user_email: email,
+                template_id: parseInt(templateId),
+                custom_html: customHtml
+            };
+            
+            fetch(`${baseUrl}/api/assign`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao atribuir assinatura');
+                }
+                return response.json();
+            })
+            .then(() => {
+                // Fechar o modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('signatureModal'));
+                modal.hide();
+                
+                showStatusMessage(`Assinatura atribuída com sucesso ao usuário ${email}`);
+            })
+            .catch(error => {
+                console.error('Erro ao atribuir assinatura:', error);
+                showStatusMessage('Erro ao atribuir assinatura', 'danger');
+            });
+        }
+
+        // Atribuir assinatura em massa
+        function bulkAssign() {
+            const templateId = document.getElementById('bulkSignatureTemplate').value;
+            const emails = getSelectedUsers();
+            
+            if (!templateId) {
+                alert('Selecione um template');
+                return;
+            }
+            
+            if (emails.length === 0) {
+                alert('Nenhum usuário selecionado');
+                return;
+            }
+            
+            let completedCount = 0;
+            let errorCount = 0;
+            
+            // Mostrar mensagem de processamento
+            showStatusMessage(`Atribuindo assinaturas para ${emails.length} usuários...`, 'info');
+            
+            // Processar cada usuário sequencialmente
+            const processNext = (index) => {
+                if (index >= emails.length) {
+                    // Todas as atribuições foram concluídas
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('bulkAssignModal'));
+                    modal.hide();
+                    
+                    if (errorCount === 0) {
+                        showStatusMessage(`Assinaturas atribuídas com sucesso para ${completedCount} usuários`);
+                    } else {
+                        showStatusMessage(`Concluído com ${completedCount} sucessos e ${errorCount} falhas`, 'warning');
+                    }
+                    
+                    return;
+                }
+                
+                const email = emails[index];
+                
+                const data = {
+                    user_email: email,
+                    template_id: parseInt(templateId),
+                    custom_html: null
+                };
+                
+                fetch(`${baseUrl}/api/assign`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(data)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erro ao atribuir para ${email}`);
+                    }
+                    return response.json();
+                })
+                .then(() => {
+                    completedCount++;
+                    // Processar o próximo usuário
+                    processNext(index + 1);
+                })
+                .catch(error => {
+                    console.error('Erro ao atribuir assinatura:', error);
+                    errorCount++;
+                    // Continuar com o próximo mesmo em caso de erro
+                    processNext(index + 1);
+                });
+            };
+            
+            // Iniciar o processamento
+            processNext(0);
+        }
+
+        // Pesquisar usuários
+        function searchUsers() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const setorFilter = document.getElementById('filterSetor').value.toLowerCase();
+            const rows = document.querySelectorAll('#userTable tr');
+            
+            let count = 0;
+            
+            rows.forEach(row => {
+                if (!row.dataset.email) return; // Ignorar linhas sem dados
+                
+                const nome = row.dataset.nome.toLowerCase();
+                const email = row.dataset.email.toLowerCase();
+                const setor = row.dataset.setor.toLowerCase();
+                
+                const matchQuery = nome.includes(query) || email.includes(query);
+                const matchSetor = !setorFilter || setor === setorFilter;
+                
+                if (matchQuery && matchSetor) {
+                    row.style.display = '';
+                    count++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            document.getElementById('userCount').textContent = `${count} usuários`;
+        }
+
+        // Limpar pesquisa
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterSetor').value = '';
+            searchUsers();
+        }
+
+        // Selecionar/Deselecionar todos os usuários
+        function toggleSelectAll() {
+            const checked = document.getElementById('selectAll').checked;
+            const checkboxes = document.querySelectorAll('.user-select');
+            
+            checkboxes.forEach(checkbox => {
+                const row = checkbox.closest('tr');
+                if (row.style.display !== 'none') {
+                    checkbox.checked = checked;
+                }
+            });
+            
+            updateSelectedButtons();
+        }
+
+        // Atualizar estado dos botões de ação em massa
+        function updateSelectedButtons() {
+            const selectedCount = getSelectedUsers().length;
+            
+            document.getElementById('btnEditSelected').disabled = selectedCount !== 1;
+            document.getElementById('btnAssignSelected').disabled = selectedCount === 0;
+        }
+
+        // Obter os e-mails dos usuários selecionados
+        function getSelectedUsers() {
+            const checkboxes = document.querySelectorAll('.user-select:checked');
+            return Array.from(checkboxes).map(checkbox => checkbox.dataset.email);
+        }
+
+        // Editar usuário selecionado
+        function editSelectedUser() {
+            const emails = getSelectedUsers();
+            
+            if (emails.length === 1) {
+                editUser(emails[0]);
+            } else if (emails.length === 0) {
+                showStatusMessage('Selecione um usuário para editar', 'warning');
+            } else {
+                showStatusMessage('Selecione apenas um usuário para editar', 'warning');
+            }
+        }
+
+        // Atribuir assinatura aos usuários selecionados
+        function assignSignatureToSelected() {
+            const emails = getSelectedUsers();
+            
+            if (emails.length === 0) {
+                showStatusMessage('Selecione pelo menos um usuário', 'warning');
+                return;
+            }
+            
+            if (emails.length === 1) {
+                assignSignature(emails[0]);
+            } else {
+                // Atribuição em massa
+                document.getElementById('selectedCount').textContent = emails.length;
+                
+                // Carregar os templates se ainda não foram carregados
+                if (document.getElementById('bulkSignatureTemplate').options.length <= 1) {
+                    loadTemplates();
+                }
+                
+                // Mostrar o modal de atribuição em massa
+                const modal = new bootstrap.Modal(document.getElementById('bulkAssignModal'));
+                modal.show();
+            }
+        }
+
+        // Logout
+        function logout() {
+            fetch(`${baseUrl}/api/admin/logout`, {
+                method: 'POST',
+                credentials: 'include'
+            })
+            .then(() => {
+                window.location.href = '/admin/login';
+            })
+            .catch(error => {
+                console.error('Erro ao fazer logout:', error);
+                showStatusMessage('Erro ao fazer logout', 'danger');
+            });
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Verificar autenticação
+            checkAuth();
+            
+            // Carregar usuários
+            loadUsers();
+            
+            // Botão de sincronizar todos os usuários
+            const btnSyncUsers = document.getElementById('btnSyncUsers');
+            if (btnSyncUsers) {
+                btnSyncUsers.addEventListener('click', syncAllUsers);
+            }
+            
+            // Botão de editar usuário selecionado
+            const btnEditSelected = document.getElementById('btnEditSelected');
+            if (btnEditSelected) {
+                btnEditSelected.addEventListener('click', editSelectedUser);
+            }
+            
+            // Botão de atribuir assinatura aos usuários selecionados
+            const btnAssignSelected = document.getElementById('btnAssignSelected');
+            if (btnAssignSelected) {
+                btnAssignSelected.addEventListener('click', assignSignatureToSelected);
+            }
+            
+            // Botão de salvar usuário
+            const btnSaveUser = document.getElementById('btnSaveUser');
+            if (btnSaveUser) {
+                btnSaveUser.addEventListener('click', saveUser);
+            }
+            
+            // Botão de atribuir assinatura
+            const btnAssign = document.getElementById('btnAssign');
+            if (btnAssign) {
+                btnAssign.addEventListener('click', saveAssignment);
+            }
+            
+            // Botão de atribuir assinatura em massa
+            const btnBulkAssign = document.getElementById('btnBulkAssign');
+            if (btnBulkAssign) {
+                btnBulkAssign.addEventListener('click', bulkAssign);
+            }
+            
+            // Checkbox de selecionar todos
+            const selectAll = document.getElementById('selectAll');
+            if (selectAll) {
+                selectAll.addEventListener('change', toggleSelectAll);
+            }
+            
+            // Campo de pesquisa
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('keyup', searchUsers);
+            }
+            
+            // Filtro de setor
+            const filterSetor = document.getElementById('filterSetor');
+            if (filterSetor) {
+                filterSetor.addEventListener('change', searchUsers);
+            }
+            
+            // Botão de limpar pesquisa
+            const btnClearSearch = document.getElementById('btnClearSearch');
+            if (btnClearSearch) {
+                btnClearSearch.addEventListener('click', clearSearch);
+            }
+            
+            // Checkbox de usar HTML personalizado
+            const useCustomHtml = document.getElementById('useCustomHtml');
+            if (useCustomHtml) {
+                useCustomHtml.addEventListener('change', function() {
+                    const customHtmlContainer = document.getElementById('customHtmlContainer');
+                    if (customHtmlContainer) {
+                        customHtmlContainer.style.display = this.checked ? 'block' : 'none';
+                    }
+                });
+            }
+
+            // Botão de logout
+            const logoutBtn = document.getElementById('logout');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    logout();
+                });
+            }
+        });
+    </script>
+</body>
+</html>

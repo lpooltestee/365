@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assinaturas Corporativas - Outlook Add-in</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    
+    <style>
+        body {
+            padding-top: 40px;
+            padding-bottom: 40px;
+        }
+        
+        .container {
+            max-width: 800px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        .logo {
+            max-width: 100px;
+            margin-bottom: 20px;
+        }
+        
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #0078d4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="{{ base_url }}/static/logo.png" alt="Logo" class="logo">
+            <h1>Assinaturas Corporativas</h1>
+            <p class="lead">Add-in para gerenciamento de assinaturas no Microsoft Outlook</p>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="card-icon">
+                            <i class="bi bi-people"></i>
+                        </div>
+                        <h5 class="card-title">Usuários</h5>
+                        <p class="card-text">Gerencie os usuários e suas assinaturas corporativas.</p>
+                        <a href="/admin/users" class="btn btn-primary">Gerenciar Usuários</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="card-icon">
+                            <i class="bi bi-envelope"></i>
+                        </div>
+                        <h5 class="card-title">Templates de Assinatura</h5>
+                        <p class="card-text">Crie e edite templates de assinaturas corporativas.</p>
+                        <a href="/admin/signatures" class="btn btn-primary">Gerenciar Templates</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Documentação</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Como Instalar o Add-in</h6>
+                        <ol>
+                            <li>Acesse o <a href="https://admin.microsoft.com" target="_blank">Admin Center do Microsoft 365</a>.</li>
+                            <li>Navegue até <strong>Configurações > Aplicativos integrados > Add-ins</strong>.</li>
+                            <li>Clique em <strong>Implantar add-in</strong> e selecione <strong>Carregar add-in personalizado</strong>.</li>
+                            <li>Faça upload do arquivo <code>manifest.xml</code>.</li>
+                            <li>Selecione os usuários para os quais o add-in deve ser disponibilizado.</li>
+                            <li>Clique em <strong>Implantar</strong>.</li>
+                        </ol>
+                        
+                        <h6>Como Usar o Add-in</h6>
+                        <p>Ao criar um novo e-mail no Outlook, o add-in irá inserir automaticamente a assinatura corporativa.</p>
+                        <p>Se necessário, você também pode clicar no botão <strong>Inserir Assinatura</strong> na faixa de opções.</p>
+                        
+                        <h6>Recursos</h6>
+                        <ul>
+                            <li><strong>Sincronização com Microsoft 365</strong> - Importe automaticamente os dados dos usuários.</li>
+                            <li><strong>Editor de Templates</strong> - Crie e personalize facilmente os templates de assinatura.</li>
+                            <li><strong>Área Administrativa</strong> - Gerencie usuários e assinaturas de forma centralizada.</li>
+                            <li><strong>Inserção Automática</strong> - A assinatura é automaticamente inserida ao criar um novo e-mail.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="mt-4 text-center text-muted">
+            <p>&copy; 2025 Hoffmann DH. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

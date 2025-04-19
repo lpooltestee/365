@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Funções do Add-in</title>
+    
+    <!-- Office.js -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+    
+    <script type="text/javascript">
+        // Inicializa o Office.js
+        Office.onReady(function() {
+            // Registra as funções que podem ser chamadas pelo manifesto
+        });
+    </script>
+    <script>
+        const baseUrl = "{{ base_url }}";
+        
+        // Função para inserir a assinatura automaticamente
+        function insertSignature(event) {
+            const userEmail = Office.context.mailbox.userProfile.emailAddress;
+
+            fetch(`${baseUrl}/api/signature?email=${encodeURIComponent(userEmail)}`)
+                .then(response => response.text())
+                .then(signatureHtml => {
+                    Office.context.mailbox.item.body.setSelectedDataAsync(
+                        signatureHtml,
+                        { coercionType: Office.CoercionType.Html },
+                        function(result) {
+                            // ...existing code...
+                        }
+                    );
+                });
+        }
+    </script>
+</head>
+<body>
+    <!-- Esta página é apenas para funções do add-in, não tem conteúdo visual -->
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assinatura Corporativa</title>
+    
+    <!-- Office.js -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: #f4f4f4;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        #loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        #error {
+            color: red;
+            padding: 10px;
+            border: 1px solid red;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        #success {
+            color: green;
+            padding: 10px;
+            border: 1px solid green;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        Carregando assinatura...
+    </div>
+    
+    <div id="content" class="hidden">
+        <h3>Assinatura Corporativa</h3>
+        <p>Sua assinatura corporativa foi aplicada ao e-mail.</p>
+    </div>
+    
+    <div id="error"></div>
+    <div id="success"></div>
+    
+    <script>
+        const baseUrl = "{{ base_url }}";
+
+        Office.onReady(function(info) {
+            if (info.host === Office.HostType.Outlook) {
+                const userEmail = Office.context.mailbox.userProfile.emailAddress;
+
+                fetch(`${baseUrl}/api/signature?email=${encodeURIComponent(userEmail)}`)
+                    .then(response => response.text())
+                    .then(signatureHtml => {
+                        Office.context.mailbox.item.body.setSelectedDataAsync(
+                            signatureHtml,
+                            { coercionType: Office.CoercionType.Html },
+                            function(result) {
+                                document.getElementById('loading').style.display = 'none';
+                                document.getElementById('content').classList.remove('hidden');
+                                
+                                if (result.status === Office.AsyncResultStatus.Failed) {
+                                    document.getElementById('error').style.display = 'block';
+                                    document.getElementById('error').innerHTML = 'Erro ao aplicar assinatura: ' + result.error.message;
+                                } else {
+                                    document.getElementById('success').style.display = 'block';
+                                    document.getElementById('success').innerHTML = 'Assinatura aplicada com sucesso!';
+                                    
+                                    setTimeout(function() {
+                                        Office.context.ui.closeContainer();
+                                    }, 2000);
+                                }
+                            }
+                        );
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

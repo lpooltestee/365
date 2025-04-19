@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Administração</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script>
+        // Função para verificar se um cookie específico existe
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // Verifica se o cookie de sessão existe ao carregar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Verificando cookie de sessão...");
+            const sessionToken = getCookie('session_token');
+            const sessionCheck = getCookie('session_check');
+            
+            if (!sessionToken && !sessionCheck) {
+                console.error("Cookie de sessão não encontrado, redirecionando para login");
+                
+                // Verificar no localStorage se temos backup de sessão
+                const localSession = localStorage.getItem('userSession');
+                if (localSession) {
+                    console.log("Dados de sessão encontrados no localStorage, tentando recuperar");
+                    const sessionData = JSON.parse(localSession);
+                    
+                    // Se a sessão foi criada há menos de 24 horas, evita redirecionar
+                    const ageInHours = (Date.now() - sessionData.timestamp) / (1000 * 60 * 60);
+                    if (ageInHours < 24) {
+                        console.log("Usando dados de backup de sessão");
+                        return; // Não redireciona, tenta usar a página mesmo sem cookie
+                    }
+                }
+                
+                // Se não houver backup ou sessão expirada, redireciona
+                window.location.href = '/admin/login';
+            } else {
+                console.log("Cookie de sessão encontrado:", sessionCheck ? "session_check=1" : (sessionToken ? sessionToken.substring(0, 10) + "..." : "nenhum"));
+                
+                // Atualizar timestamp no localStorage
+                const localSession = localStorage.getItem('userSession');
+                if (localSession) {
+                    const sessionData = JSON.parse(localSession);
+                    sessionData.timestamp = Date.now();
+                    localStorage.setItem('userSession', JSON.stringify(sessionData));
+                }
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="text-center">Painel de Administração</h1>
+        <p class="text-center text-muted">Gerencie usuários e templates de assinatura corporativa.</p>
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Usuários</h5>
+                        <p class="card-text">Gerencie os usuários e suas assinaturas corporativas.</p>
+                        <a href="/admin/users" class="btn btn-primary">Gerenciar Usuários</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Templates de Assinatura</h5>
+                        <p class="card-text">Crie e edite templates de assinaturas corporativas.</p>
+                        <a href="/admin/signatures" class="btn btn-primary">Gerenciar Templates</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
